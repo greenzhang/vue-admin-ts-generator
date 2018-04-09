@@ -1,4 +1,5 @@
 const fs = require('fs-extra')
+const changeCase = require('change-case')
 const path = require('path')
 const routePath = path.resolve('src', 'route', 'index.ts')
 const validatorNotEmpty = (name) => (value) =>
@@ -10,158 +11,73 @@ const appendRoute = (config) => {
   console.log(JSON.parse(routes))
 }
 
-module.exports = function(plop) {
-  plop.handlebars.registerHelper('x', function(expression, options) {
-    var result
-    var context = this
-    with (context) {
-      result = function() {
-        try {
-          return eval(expression)
-        } catch (e) {
-          console.warn(
-            "•Expression: {{x '" + expression + "'}}\n•JS-Error: ",
-            e,
-            '\n•Context: ',
-            context
+module.exports = function(plop, config) {
+  config = config || {}
+  config.basePath = config.basePath || './src'
+  config.prefix = config.prefix ? config.prefix + ':' : ''
+  plop.setGenerator('view', {
+    description: 'Generate View',
+    prompts: [
+      {
+        type: 'input',
+        message: 'Your View name',
+        name: 'viewName',
+        validate: (value) => {
+          if (!value.length) return 'A view name is required.'
+          if (!value.match(/^[a-zA-Z]+$/))
+            return 'A view name can only contain letters.'
+          //   if (changeCase.pascalCase(value) !== value)
+          //     return 'A view name must be written in PascalCase.'
+          return true
+        }
+      },
+      {
+        type: 'confirm',
+        message: 'Do you want to add a route for this view?',
+        name: 'shouldAddRoute'
+      }
+    ],
+    actions: (answers) => {
+      const viewName = changeCase.pascalCase(answers.viewName)
+      let actions = [
+        {
+          type: 'add',
+          path: path.resolve(config.basePath, `views/${viewName}.vue`),
+          templateFile: path.resolve(__dirname, 'scaffold/views/view.hbs')
+        },
+        {
+          type: 'add',
+          path: path.resolve(
+            config.basePath,
+            `components/${viewName}/index.vue`
+          ),
+          templateFile: path.resolve(
+            __dirname,
+            'scaffold/components/component.hbs'
           )
         }
-      }.call(context)
+      ]
+
+      if (answers.shouldAddRoute) {
+        actions = actions.concat([
+          {
+            type: 'modify',
+            path: path.resolve(config.basePath, 'route', 'index.ts'),
+            pattern: /(\/\*\!\ scaffold:insert:route \*\/)/, // https://regex101.com/r/kVn3CA/1
+            template:
+              "{\n      path: '/{{lowerCase viewName }}',\n      name: '{{ viewName }}',\n      component: {{ viewName }}\n    },\n    $1"
+          },
+          {
+            type: 'modify',
+            path: path.resolve(config.basePath, 'route', 'index.ts'),
+            pattern: /(\/\*\!\ scaffold:import:route \*\/)/, // https://regex101.com/r/azlBwd/1
+            template:
+              "import {{ viewName }} from '@/views/{{pascalCase viewName }}.vue'\n$1"
+          }
+        ])
+      }
+
+      return actions
     }
-    return result
-  })
-
-  plop.handlebars.registerHelper('xif', function(expression, options) {
-    return plop.handlebars.helpers['x'].apply(this, [expression, options])
-      ? options.fn(this)
-      : options.inverse(this)
-  })
-
-  plop.addHelper('vueExtensionForType', function(type) {
-    return type == 'tsx' ? 'vuex' : 'vue'
-  })
-
-  function extractNameAndFolder(data) {
-    let { name } = data
-    if (name.indexOf('/') !== false) {
-      let [last_name, ...parts] = name.split(/\//g).reverse()
-      data.folder = parts.reverse().join('/')
-      data.name = last_name
-    }
-  }
-
-  plop.setGenerator('vue', {
-    description: 'Create new Vue view with component',
-    prompts: [
-      {
-        type: 'input',
-        name: 'viewname',
-        message: 'View Name:',
-        validate: validatorNotEmpty('View Name')
-      },
-      {
-        type: 'input',
-        name: 'folder',
-        message: 'View Name:',
-        validate: validatorNotEmpty('View Name')
-      },
-      {
-        type: 'input',
-        name: 'name',
-        message: 'Component NAME:',
-        validate: validatorNotEmpty('Component name')
-      },
-      {
-        type: 'list',
-        name: 'lang',
-        default: 'ts',
-        choices: [
-          { value: 'ts', name: 'TypeScript' },
-          { value: 'tsx', name: 'TypeScript with JSX support' },
-          { value: '', name: 'Javascript' }
-        ],
-        message: 'Component language:'
-      }
-    ],
-    actions: [
-      {
-        type: 'add',
-        path:
-          'src/components/{{properCase folder}}/{{properCase name}}.{{vueExtensionForType lang}}',
-        templateFile: 'templates/component.vue'
-      }
-    ]
-  })
-  plop.setGenerator('vue-tsx', {
-    description: 'Create new vue component in tsx',
-    prompts: [
-      {
-        type: 'input',
-        name: 'name',
-        message: 'Component name:',
-        validate: validatorNotEmpty('Component name')
-      },
-      {
-        type: 'input',
-        name: 'folder',
-        message: 'Component path:',
-        validate: validatorNotEmpty('Component path')
-      }
-    ],
-    actions: [
-      {
-        type: 'add',
-        path: 'src/components/{{folder}}/{{properCase name}}.tsx',
-        templateFile: 'templates/vue-component.tsx'
-      }
-    ]
-  })
-  plop.setGenerator('vue-functional', {
-    description: 'Create new vue component',
-    prompts: [
-      {
-        type: 'input',
-        name: 'name',
-        message: 'Component name:',
-        validate: validatorNotEmpty('Component name')
-      },
-      {
-        type: 'input',
-        name: 'folder',
-        message: 'Component path:',
-        validate: validatorNotEmpty('Component path')
-      }
-    ],
-    actions: [
-      {
-        type: 'add',
-        path: 'src/components/{{folder}}/{{properCase name}}.tsx',
-        templateFile: 'templates/vue-functional-component.tsx'
-      }
-    ]
-  })
-  plop.setGenerator('vue-directive', {
-    description: 'Create new vue directive',
-    prompts: [
-      {
-        type: 'input',
-        name: 'name',
-        message: 'Directive name:',
-        validate: validatorNotEmpty('Directive name')
-      },
-      {
-        type: 'input',
-        name: 'folder',
-        message: 'Directive path:',
-        validate: validatorNotEmpty('Directive path')
-      }
-    ],
-    actions: [
-      {
-        type: 'add',
-        path: 'src/components/{{folder}}/{{properCase name}}.ts',
-        templateFile: 'templates/vue-directive.ts'
-      }
-    ]
   })
 }

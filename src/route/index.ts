@@ -1,17 +1,26 @@
-import Home from '@/views/Home.vue'
-import ShoppingCard from '@/views/About.vue'
+import Dashboard from '@/views/Dashboard.vue'
+import sign from '@/views/Sign.vue'
+import redirect from '@/views/Redirect.vue'
+/*! scaffold:import:route */
+
 let Routes = {
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: Home
+      name: 'dashboard',
+      component: Dashboard
     },
     {
-      path: '/shoppingcard',
-      name: 'shoppingcard',
-      component: ShoppingCard
+      path: '/sign',
+      name: 'sign',
+      component: sign
+    },
+    {
+      path: '/redirect',
+      name: 'redirect',
+      component: redirect
     }
+    /*! scaffold:insert:route */
   ]
 }
 export default Routes
